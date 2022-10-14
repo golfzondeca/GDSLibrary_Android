@@ -6,15 +6,19 @@ import android.graphics.Bitmap
 import android.net.Uri
 import com.android.volley.Response
 import com.android.volley.toolbox.Volley
+import com.golfzondeca.gds.data.realm.CCFileInfo
+import com.golfzondeca.gds.data.realm.Undulation
 import com.golfzondeca.gds.util.AltitudeUtil
-import com.golfzondeca.gds.util.AltitudeUtilJava
-import com.golfzondeca.gds.volley.CCFileRequest
-import com.golfzondeca.gds.volley.CCFileResponse
-import com.golfzondeca.gds.volley.CCSearchRequest
-import com.golfzondeca.gds.volley.CCSearchResponse
+import com.golfzondeca.gds.volley.*
+import io.realm.kotlin.Realm
+import io.realm.kotlin.RealmConfiguration
+import io.realm.kotlin.ext.query
+import io.realm.kotlin.types.RealmInstant
 import timber.log.Timber
 import java.io.FileInputStream
+import java.math.BigInteger
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -52,6 +56,32 @@ class GDSRepository (
             error: Int
         )
     }
+
+
+    private val config =
+        RealmConfiguration
+            .Builder(schema = setOf(CCFileInfo::class, Undulation::class))
+            .schemaVersion(1L)
+            .encryptionKey(getSHA512("DECA_$id"))
+            .name("gdcfi")
+            .build()
+
+    private fun getSHA512(str: String): ByteArray {
+        try {
+            val md = MessageDigest.getInstance("SHA-512")
+            md.update(str.toByteArray())
+            val hash = md.digest()
+
+            Timber.e(String.format("%128X", BigInteger(1, hash)))
+            return hash
+        }
+        catch (e: CloneNotSupportedException) {
+
+        }
+        return byteArrayOf()
+    }
+
+    private val realm = Realm.open(config)
 
     private val searchCCQueue by lazy { Volley.newRequestQueue(context) }
     private val decQueue by lazy { Volley.newRequestQueue(context) }
@@ -184,6 +214,16 @@ class GDSRepository (
                 val country = searchCC.countryCode!!
                 val state = searchCC.stateCode!!
 
+                realm.writeBlocking {
+                    val ccFileInfo =
+                        query<CCFileInfo>("ccID == $0", ccID).first().find() ?:
+                        copyToRealm(CCFileInfo().apply { this.ccID = ccID })
+
+                    ccFileInfo.countryCode = country
+                    ccFileInfo.stateCode = state
+                    ccFileInfo.downloadDate = RealmInstant.from(Date().time / 1000, 0)
+                }
+
                 if(!ccDataMap.containsKey(ccID)) {
                     ccDataMap[ccID] = CCData(country)
                 }
@@ -199,9 +239,10 @@ class GDSRepository (
 
                     Timber.d("url : $decUrl")
 
-                    val decRequest = CCFileRequest(
+                    val decRequest = UndulationFileRequest(
                         decUrl,
                         ccID,
+                        courseNum,
                         downloadPath,
                         decListener,
                         decErrorListener,
@@ -228,7 +269,7 @@ class GDSRepository (
 
                 Timber.d("url : $binUrl")
 
-                val binRequest = CCFileRequest(
+                val binRequest = AltitudeFileRequest(
                     binUrl,
                     ccID,
                     downloadPath,
@@ -252,8 +293,21 @@ class GDSRepository (
         broadcastError(ERROR_NETWORK)
     }
 
-    private val decListener = Response.Listener<CCFileResponse> {
+    private val decListener = Response.Listener<UndulationFileResponse> {
         it.downloadFile?.let { file ->
+            realm.writeBlocking {
+                query<CCFileInfo>("ccID == $0", it.ccID).first().find()?.undulations?.let { list ->
+                    list.firstOrNull{ undulation -> undulation.courseNum == it.courseNum }?.let {
+                        delete(it)
+                    }
+
+                    list.add(copyToRealm(Undulation().apply {
+                        this.courseNum = it.courseNum
+                        this.file = file.name
+                    }))
+                }
+            }
+
             val decFileData = ByteArray(file.length().toInt())
 
             FileInputStream(file).apply {
@@ -278,8 +332,12 @@ class GDSRepository (
         }
     }
 
-    private val binListener = Response.Listener<CCFileResponse> {
+    private val binListener = Response.Listener<AltitudeFileResponse> {
         it.downloadFile?.let { file ->
+            realm.writeBlocking {
+                query<CCFileInfo>("ccID == $0", it.ccID).first().find()?.altitude = file.name
+            }
+
             val binFileData = ByteArray(file.length().toInt())
 
             FileInputStream(file).let {

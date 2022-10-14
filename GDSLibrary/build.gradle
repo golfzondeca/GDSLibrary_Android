@@ -3,6 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id "com.google.protobuf" version "0.8.12"
     id 'kotlin-kapt'
+    id 'io.realm.kotlin'
 }
 
 android {
@@ -40,7 +41,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4"
 
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.5.0"
 
@@ -53,6 +54,7 @@ dependencies {
     implementation "com.android.volley:volley:1.2.1"
 
     implementation group: 'org.simpleframework', name: 'simple-xml', version: '2.7.1'
+    implementation 'io.realm.kotlin:library-base:1.3.0'
 }
 
 protobuf {

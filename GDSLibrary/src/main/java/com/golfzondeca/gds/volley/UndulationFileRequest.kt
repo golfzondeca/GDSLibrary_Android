@@ -7,7 +7,6 @@ import com.android.volley.toolbox.HttpHeaderParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.math.BigInteger
@@ -15,11 +14,12 @@ import java.security.MessageDigest
 import java.util.*
 import kotlin.random.Random
 
-class CCFileRequest(
+class UndulationFileRequest(
     url: String,
     private val ccID: String,
+    private val courseNum: Int,
     private val downloadFolderPath: String,
-    private val listener: Response.Listener<CCFileResponse>,
+    private val listener: Response.Listener<UndulationFileResponse>,
     errorListener: Response.ErrorListener,
     initialTimeoutMs: Int = 6000,
     maxNumRetries: Int = 5,
@@ -50,9 +50,9 @@ class CCFileRequest(
                 outputStream.write(response)
                 outputStream.close()
             }.onSuccess {
-                listener.onResponse(CCFileResponse(ccID, downloadFile))
+                listener.onResponse(UndulationFileResponse(ccID, courseNum, downloadFile))
             }.onFailure {
-                listener.onResponse(CCFileResponse(ccID, null))
+                listener.onResponse(UndulationFileResponse(ccID, courseNum, null))
             }
 
         }
