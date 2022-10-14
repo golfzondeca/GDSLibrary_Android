@@ -115,7 +115,7 @@ class GDSRepository (
 
     fun getUndulationMap(
         ccID: String,
-        courseID: Int,
+        courseNum: Int,
         holeNum: Int,
     ): Array<Bitmap>? {
         ccDataMap[ccID]?.decFileData?.let {
@@ -153,6 +153,23 @@ class GDSRepository (
         )
 
         searchCCQueue.add(request)
+    }
+
+    private fun broadcastReady() {
+        ccRequestStatusQueue.poll()?.let { status ->
+            callbacks.forEach {
+                it.onCCDataReady(status.ccID)
+            }
+        }
+    }
+
+    private fun broadcastError(errorCode: Int) {
+        ccRequestStatusQueue.poll()?.let { status ->
+            ccDataMap.remove(status.ccID)
+            callbacks.forEach {
+                it.onCCDataFailed(status.ccID, errorCode)
+            }
+        }
     }
 
     private val searchListener = Response.Listener<CCSearchResponse> {
@@ -223,32 +240,16 @@ class GDSRepository (
 
                 binQueue.add(binRequest)
             } else {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    ccDataMap.remove(status.ccID)
-                    callbacks.forEach {
-                        it.onCCDataFailed(status.ccID, ERROR_CC_INFO)
-                    }
-                }
+                broadcastError(ERROR_CC_INFO)
             }
         } ?: let {
-            ccRequestStatusQueue.poll()?.let { status ->
-                ccDataMap.remove(status.ccID)
-                callbacks.forEach {
-                    it.onCCDataFailed(status.ccID, ERROR_CC_INFO)
-                }
-            }
+            broadcastError(ERROR_CC_INFO)
         }
     }
 
     private val searchErrorListener = Response.ErrorListener {
         ccRequestStatusQueue.peek()?.isInfoCheck = true
-
-        ccRequestStatusQueue.poll()?.let { status ->
-            ccDataMap.remove(status.ccID)
-            callbacks.forEach {
-                it.onCCDataFailed(status.ccID, ERROR_NETWORK)
-            }
-        }
+        broadcastError(ERROR_NETWORK)
     }
 
     private val decListener = Response.Listener<CCFileResponse> {
@@ -267,23 +268,12 @@ class GDSRepository (
             ccRequestStatusQueue.peek()?.isDecCheck = true
 
             if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    callbacks.forEach {
-                        it.onCCDataReady(status.ccID)
-                    }
-                }
+                broadcastReady()
             }
 
         } ?: run {
             if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                callbacks.forEach {
-                    ccRequestStatusQueue.poll()?.let { status ->
-                        ccDataMap.remove(status.ccID)
-                        callbacks.forEach {
-                            it.onCCDataFailed(status.ccID, ERROR_DOWNLOAD)
-                        }
-                    }
-                }
+                broadcastError(ERROR_DOWNLOAD)
             }
         }
     }
@@ -304,20 +294,11 @@ class GDSRepository (
             ccRequestStatusQueue.peek()?.isBinCheck = true
 
             if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    callbacks.forEach {
-                        it.onCCDataReady(status.ccID)
-                    }
-                }
+                broadcastReady()
             }
         } ?: run {
             if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    ccDataMap.remove(status.ccID)
-                    callbacks.forEach {
-                        it.onCCDataFailed(status.ccID, ERROR_DOWNLOAD)
-                    }
-                }
+                broadcastError(ERROR_DOWNLOAD)
             }
         }
     }
@@ -325,22 +306,13 @@ class GDSRepository (
     private val decErrorListener = Response.ErrorListener {
         ccRequestStatusQueue.peek()?.isDecCheck = true
 
-        if(it.networkResponse.statusCode / 100 != 4) {
-            if (ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    ccDataMap.remove(status.ccID)
-                    callbacks.forEach {
-                        it.onCCDataFailed(status.ccID, ERROR_NETWORK)
-                    }
-                }
+        if(it.networkResponse.statusCode in arrayOf(403, 404)) {
+            if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
+                broadcastReady()
             }
         } else {
-            if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    callbacks.forEach {
-                        it.onCCDataReady(status.ccID)
-                    }
-                }
+            if (ccRequestStatusQueue.peek()?.isBinCheck == true) {
+                broadcastError(ERROR_NETWORK)
             }
         }
     }
@@ -348,22 +320,13 @@ class GDSRepository (
     private val binErrorListener = Response.ErrorListener {
         ccRequestStatusQueue.peek()?.isBinCheck = true
 
-        if(it.networkResponse.statusCode / 100 != 4) {
-            if (ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    ccDataMap.remove(status.ccID)
-                    callbacks.forEach {
-                        it.onCCDataFailed(status.ccID, ERROR_NETWORK)
-                    }
-                }
+        if(it.networkResponse.statusCode in arrayOf(403, 404)) {
+            if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
+                broadcastReady()
             }
         } else {
-            if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                ccRequestStatusQueue.poll()?.let { status ->
-                    callbacks.forEach {
-                        it.onCCDataReady(status.ccID)
-                    }
-                }
+            if (ccRequestStatusQueue.peek()?.isDecCheck == true) {
+                broadcastError(ERROR_NETWORK)
             }
         }
     }
