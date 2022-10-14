@@ -98,9 +98,10 @@ class GDSRepository (
 
     private class CCData (
         var countryCode: String,
-        var decFileData: ByteBuffer? = null,
-        var binFileData: ByteBuffer? = null
-    )
+        var binFileData: ByteBuffer? = null,
+    ) {
+        val decFileDatas = mutableMapOf<Int, ByteBuffer>()
+    }
 
     private val ccDataMap = mutableMapOf<String, CCData>()
 
@@ -148,7 +149,7 @@ class GDSRepository (
         courseNum: Int,
         holeNum: Int,
     ): Array<Bitmap>? {
-        ccDataMap[ccID]?.decFileData?.let {
+        ccDataMap[ccID]?.decFileDatas?.get(courseNum)?.let {
             return null
         } ?: run {
             return null
@@ -317,7 +318,7 @@ class GDSRepository (
 
             val ccData = ccDataMap[it.ccID]
 
-            ccData!!.decFileData = ByteBuffer.wrap(decFileData)
+            ccData!!.decFileDatas[it.courseNum] = ByteBuffer.wrap(decFileData)
 
             ccRequestStatusQueue.peek()?.isDecCheck = true
 
