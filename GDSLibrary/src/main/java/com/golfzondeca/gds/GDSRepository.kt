@@ -7,13 +7,20 @@ import android.net.Uri
 import com.android.volley.Response
 import com.android.volley.toolbox.Volley
 import com.golfzondeca.gds.data.realm.CCFileInfo
-import com.golfzondeca.gds.data.realm.Undulation
+import com.golfzondeca.gds.data.realm.HoleMap
+import com.golfzondeca.gds.data.realm.UndulationMap
 import com.golfzondeca.gds.util.AltitudeUtil
 import com.golfzondeca.gds.volley.*
 import io.realm.kotlin.Realm
 import io.realm.kotlin.RealmConfiguration
 import io.realm.kotlin.ext.query
 import io.realm.kotlin.types.RealmInstant
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileInputStream
 import java.math.BigInteger
@@ -21,28 +28,34 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.Lock
+import java.util.function.IntUnaryOperator
 
 @SuppressLint("MissingPermission")
 class GDSRepository (
     private val context: Context,
-    private val id: String,
-    private val password: String,
+    private val gdsID: String,
 ) {
 
     companion object {
-        // 그린 맵 파일
-        private const val URL_UPDATE_DEC = "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/w10/dec/"
+        // 그린 파일
+        private const val URL_UPDATE_UNDULATION_MAP_DEC =
+            "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/w10/ccid_green/L1/ccid/"
+
+        // 맵 파일
+        private const val URL_UPDATE_HOLE_MAP_DEC =
+            "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/w10/dec/"
 
         // 고도 파일 (.bin)
         private const val URL_UPDATE_BIN =
             "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/slope/slope_mobile/"
 
-        // 고도 파일 (.bin)
+        /*// CC 찾기
         private const val URL_SEARCH_CC =
-            "https://www.gpsgolfbuddy.com/app/cc/search.asp"
+            "https://www.gpsgolfbuddy.com/app/cc/search.asp"*/
 
         const val ERROR_NETWORK = 1
-        const val ERROR_CC_INFO = 2
         const val ERROR_DOWNLOAD = 3
     }
 
@@ -57,12 +70,11 @@ class GDSRepository (
         )
     }
 
-
     private val config =
         RealmConfiguration
-            .Builder(schema = setOf(CCFileInfo::class, Undulation::class))
+            .Builder(schema = setOf(CCFileInfo::class, HoleMap::class, UndulationMap::class))
             .schemaVersion(1L)
-            .encryptionKey(getSHA512("DECA_$id"))
+            .encryptionKey(getSHA512("DECA_$gdsID"))
             .name("gdcfi")
             .build()
 
@@ -83,24 +95,29 @@ class GDSRepository (
 
     private val realm = Realm.open(config)
 
-    private val searchCCQueue by lazy { Volley.newRequestQueue(context) }
-    private val decQueue by lazy { Volley.newRequestQueue(context) }
+    private val undulationMapQueue by lazy { Volley.newRequestQueue(context) }
+    private val holeMapQueue by lazy { Volley.newRequestQueue(context) }
     private val binQueue by lazy { Volley.newRequestQueue(context) }
+
+    private val countDownContext = newSingleThreadContext("CountDown")
 
     private class CCRequestStatus (
         val ccID: String,
-        var isInfoCheck: Boolean = false,
-        var isDecCheck: Boolean = false,
-        var isBinCheck: Boolean = false
-    )
+        var binFileCheck: Boolean,
+    ) {
+        val holeMapCheckMap: MutableMap<Int, Boolean> = mutableMapOf()
+        val undulationMapCheckMap: MutableMap<Int, Boolean> = mutableMapOf()
+    }
 
     private val ccRequestStatusQueue = ConcurrentLinkedQueue<CCRequestStatus>()
+    private val mutex = Mutex()
 
     private class CCData (
-        var countryCode: String,
+        var countryCode: Int,
         var binFileData: ByteBuffer? = null,
     ) {
-        val decFileDatas = mutableMapOf<Int, ByteBuffer>()
+        val holeMapFileDatas = mutableMapOf<Int, ByteBuffer>()
+        val undulationMapFileDatas = mutableMapOf<Int, ByteBuffer>()
     }
 
     private val ccDataMap = mutableMapOf<String, CCData>()
@@ -144,20 +161,36 @@ class GDSRepository (
         }
     }
 
-    fun getUndulationMap(
+    fun getHoleMap(
         ccID: String,
         courseNum: Int,
         holeNum: Int,
     ): Array<Bitmap>? {
-        ccDataMap[ccID]?.decFileDatas?.get(courseNum)?.let {
+        ccDataMap[ccID]?.holeMapFileDatas?.get(courseNum)?.let {
             return null
         } ?: run {
             return null
         }
     }
 
-    fun loadCCData(
+    fun getUndulationMap(
         ccID: String,
+        courseNum: Int,
+        holeNum: Int,
+    ): Array<Bitmap>? {
+        ccDataMap[ccID]?.undulationMapFileDatas?.get(courseNum)?.let {
+            return null
+        } ?: run {
+            return null
+        }
+    }
+
+    /*fun loadCCData(
+        ccID: String,
+        courseCount: Int,
+        useAltitude: Boolean,
+        useHoleMap: Boolean,
+        useUndulationMap: Boolean,
     ) {
         val url = Uri
             .parse(URL_SEARCH_CC)
@@ -184,6 +217,101 @@ class GDSRepository (
         )
 
         searchCCQueue.add(request)
+    }*/
+
+    fun loadCCData(
+        ccID: String,
+        countryCode: Int,
+        stateCode: Int,
+        courseCount: Int,
+        useAltitude: Boolean,
+        useHoleMap: Boolean,
+        useUndulationMap: Boolean,
+    ) {
+        realm.writeBlocking {
+            val ccFileInfo =
+                query<CCFileInfo>("ccID == $0", ccID).first().find() ?:
+                copyToRealm(CCFileInfo().apply { this.ccID = ccID })
+
+            ccFileInfo.countryCode = countryCode
+            ccFileInfo.stateCode = stateCode
+            ccFileInfo.downloadDate = RealmInstant.from(Date().time / 1000, 0)
+        }
+
+        if(!ccDataMap.containsKey(ccID)) {
+            ccDataMap[ccID] = CCData(countryCode)
+        }
+
+        val downloadPath = "${context.dataDir}/map"
+
+        ccRequestStatusQueue.offer(
+            CCRequestStatus(
+                ccID,
+                !useAltitude,
+            ).apply {
+                if(useHoleMap) {
+                    repeat(courseCount) {
+                        if(useHoleMap) holeMapCheckMap[it + 1] = false
+                        if(useUndulationMap) undulationMapCheckMap[it + 1] = false
+                    }
+                }
+            }
+        )
+
+        if(useHoleMap) {
+            for (courseNum in 1..courseCount.toInt()) {
+                val holeMapUrl = Uri
+                    .parse(URL_UPDATE_HOLE_MAP_DEC)
+                    .buildUpon()
+                    .appendPath("${ccID}_${courseNum}.dec")
+                    .build().toString()
+
+                Timber.d("url : $holeMapUrl")
+
+                val holeMapRequest = DecFileRequest(
+                    holeMapUrl,
+                    ccID,
+                    courseNum,
+                    downloadPath,
+                    holeMapListener,
+                    holeMapErrorListener,
+                    10000,
+                    0
+                )
+
+                holeMapQueue.add(holeMapRequest)
+            }
+        }
+
+        if(useAltitude) {
+            val locationPath =
+                when (countryCode) {
+                    1 -> "L${countryCode}_v2" // 한국
+                    2 -> "L${countryCode}_${stateCode}" // 미국
+                    else -> "L${countryCode}"
+                }
+
+            val binUrl = Uri
+                .parse(URL_UPDATE_BIN)
+                .buildUpon()
+                .appendPath(locationPath)
+                .appendPath("${ccID}_cb_4M.bin")
+                .build().toString()
+
+            Timber.d("url : $binUrl")
+
+            val binRequest = AltitudeFileRequest(
+                binUrl,
+                ccID,
+                downloadPath,
+                binListener,
+                binErrorListener,
+                10000,
+                0
+            )
+
+            binQueue.add(binRequest)
+        }
     }
 
     private fun broadcastReady() {
@@ -203,7 +331,7 @@ class GDSRepository (
         }
     }
 
-    private val searchListener = Response.Listener<CCSearchResponse> {
+    /*private val searchListener = Response.Listener<CCSearchResponse> {
         ccRequestStatusQueue.peek()?.isInfoCheck = true
 
         it?.let {
@@ -232,26 +360,26 @@ class GDSRepository (
                 val downloadPath = "${context.dataDir}/map"
 
                 for(courseNum in 1..courseCount.toInt()) {
-                    val decUrl = Uri
-                        .parse(URL_UPDATE_DEC)
+                    val holeMapUrl = Uri
+                        .parse(URL_UPDATE_HOLE_MAP_DEC)
                         .buildUpon()
                         .appendPath("${ccID}_${courseNum}.dec")
                         .build().toString()
 
-                    Timber.d("url : $decUrl")
+                    Timber.d("url : $holeMapUrl")
 
-                    val decRequest = UndulationFileRequest(
-                        decUrl,
+                    val holeMapRequest = DecFileRequest(
+                        holeMapUrl,
                         ccID,
                         courseNum,
                         downloadPath,
-                        decListener,
-                        decErrorListener,
+                        holeMapListener,
+                        holeMapErrorListener,
                         10000,
                         0
                     )
 
-                    decQueue.add(decRequest)
+                    holeMapQueue.add(holeMapRequest)
                 }
                 
                 val locationPath =
@@ -292,17 +420,18 @@ class GDSRepository (
     private val searchErrorListener = Response.ErrorListener {
         ccRequestStatusQueue.peek()?.isInfoCheck = true
         broadcastError(ERROR_NETWORK)
-    }
+    }*/
 
-    private val decListener = Response.Listener<UndulationFileResponse> {
+    private val holeMapListener = Response.Listener<UndulationFileResponse> {
+        Timber.d("holeMapListener")
         it.downloadFile?.let { file ->
             realm.writeBlocking {
-                query<CCFileInfo>("ccID == $0", it.ccID).first().find()?.undulations?.let { list ->
-                    list.firstOrNull{ undulation -> undulation.courseNum == it.courseNum }?.let {
+                query<CCFileInfo>("ccID == $0", it.ccID).first().find()?.holeMaps?.let { list ->
+                    list.firstOrNull{ holeMap -> holeMap.courseNum == it.courseNum }?.let {
                         delete(it)
                     }
 
-                    list.add(copyToRealm(Undulation().apply {
+                    list.add(copyToRealm(HoleMap().apply {
                         this.courseNum = it.courseNum
                         this.file = file.name
                     }))
@@ -318,22 +447,44 @@ class GDSRepository (
 
             val ccData = ccDataMap[it.ccID]
 
-            ccData!!.decFileDatas[it.courseNum] = ByteBuffer.wrap(decFileData)
+            ccData!!.holeMapFileDatas[it.courseNum] = ByteBuffer.wrap(decFileData)
 
-            ccRequestStatusQueue.peek()?.isDecCheck = true
+            CoroutineScope(countDownContext).launch {
+                ccRequestStatusQueue.peek()?.let { status ->
+                    status.holeMapCheckMap[it.courseNum] = true
 
-            if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                broadcastReady()
+                    Timber.d("hole")
+                    if (
+                        status.ccID == it.ccID &&
+                        status.binFileCheck &&
+                        status.holeMapCheckMap.all { it.value } &&
+                        status.undulationMapCheckMap.all { it.value }
+                    ) {
+                        broadcastReady()
+                    }
+                }
             }
 
         } ?: run {
-            if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                broadcastError(ERROR_DOWNLOAD)
+            CoroutineScope(countDownContext).launch {
+                ccRequestStatusQueue.peek()?.let { status ->
+                    status.holeMapCheckMap[it.courseNum] = true
+
+                    if (
+                        status.ccID == it.ccID &&
+                        status.binFileCheck &&
+                        status.holeMapCheckMap.all { it.value } &&
+                        status.undulationMapCheckMap.all { it.value }
+                    ) {
+                        broadcastError(ERROR_DOWNLOAD)
+                    }
+                }
             }
         }
     }
 
     private val binListener = Response.Listener<AltitudeFileResponse> {
+        Timber.d("binListener")
         it.downloadFile?.let { file ->
             realm.writeBlocking {
                 query<CCFileInfo>("ccID == $0", it.ccID).first().find()?.altitude = file.name
@@ -350,42 +501,73 @@ class GDSRepository (
 
             ccData!!.binFileData = ByteBuffer.wrap(binFileData)
 
-            ccRequestStatusQueue.peek()?.isBinCheck = true
+            CoroutineScope(countDownContext).launch {
+                ccRequestStatusQueue.peek()?.let { status ->
+                    status.binFileCheck = true
 
-            if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                broadcastReady()
+                    Timber.d("bin")
+                    if (
+                        status.ccID == it.ccID &&
+                        status.binFileCheck &&
+                        status.holeMapCheckMap.all { it.value } &&
+                        status.undulationMapCheckMap.all { it.value }
+                    ) {
+                        broadcastReady()
+                    }
+                }
             }
         } ?: run {
-            if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                broadcastError(ERROR_DOWNLOAD)
+            CoroutineScope(countDownContext).launch {
+                ccRequestStatusQueue.peek()?.let { status ->
+                    status.binFileCheck = true
+
+                    if (
+                        status.ccID == it.ccID &&
+                        status.binFileCheck &&
+                        status.holeMapCheckMap.all { it.value } &&
+                        status.undulationMapCheckMap.all { it.value }
+                    ) {
+                        broadcastError(ERROR_DOWNLOAD)
+                    }
+                }
             }
         }
     }
 
-    private val decErrorListener = Response.ErrorListener {
-        ccRequestStatusQueue.peek()?.isDecCheck = true
-
-        if(it.networkResponse.statusCode in arrayOf(403, 404)) {
-            if(ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                broadcastReady()
-            }
-        } else {
-            if (ccRequestStatusQueue.peek()?.isBinCheck == true) {
-                broadcastError(ERROR_NETWORK)
+    private val holeMapErrorListener = Response.ErrorListener {
+        CoroutineScope(countDownContext).launch {
+            ccRequestStatusQueue.peek()?.let { status ->
+                status.holeMapCheckMap.clear()
+                if (
+                    status.binFileCheck &&
+                    status.holeMapCheckMap.all { it.value } &&
+                    status.undulationMapCheckMap.all { it.value }
+                ) {
+                    if (it.networkResponse.statusCode in arrayOf(403, 404)) {
+                        broadcastError(ERROR_DOWNLOAD)
+                    } else {
+                        broadcastError(ERROR_NETWORK)
+                    }
+                }
             }
         }
     }
 
     private val binErrorListener = Response.ErrorListener {
-        ccRequestStatusQueue.peek()?.isBinCheck = true
-
-        if(it.networkResponse.statusCode in arrayOf(403, 404)) {
-            if(ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                broadcastReady()
-            }
-        } else {
-            if (ccRequestStatusQueue.peek()?.isDecCheck == true) {
-                broadcastError(ERROR_NETWORK)
+        CoroutineScope(countDownContext).launch {
+            ccRequestStatusQueue.peek()?.let { status ->
+                status.binFileCheck = true
+                if (
+                    status.binFileCheck &&
+                    status.holeMapCheckMap.all { it.value } &&
+                    status.undulationMapCheckMap.all { it.value }
+                ) {
+                    if (it.networkResponse.statusCode in arrayOf(403, 404)) {
+                        broadcastError(ERROR_DOWNLOAD)
+                    } else {
+                        broadcastError(ERROR_NETWORK)
+                    }
+                }
             }
         }
     }

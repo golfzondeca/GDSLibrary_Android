@@ -12,20 +12,20 @@ class AltitudeUtil {
         private const val WATER_SLOPE = 48676
         private const val WATER_SLOPE_8 = -9999
 
-        fun getAltitude(countryCode: String, altitudeFileData: ByteBuffer, latitude: Double, longitude: Double): Int? {
+        fun getAltitude(countryCode: Int, altitudeFileData: ByteBuffer, latitude: Double, longitude: Double): Int? {
             altitudeFileData.order(ByteOrder.LITTLE_ENDIAN)
 
             return when(countryCode) {
-                "4" ->
+                4 ->
                     getAltitudeJapan(altitudeFileData, latitude, longitude)
-                "1", "2", "9",
-                "7", "8", "12" ,"15" ,"23" ,"29" ,"30" ,"36" ,"41" ,
-                "59" ,"60" ,"61" ,"62" ,"71" ,"75" ,"76" ,"83" ,"84" ,
-                "90" ,"97" ,"98" ,"100" ,"102" ,"104" ,"105" ,"113" ,
-                "115" ,"116" ,"117" ,"119" ,"125" ,"132" ,"133" ,"141" ,
-                "149" ,"158" ,"159" ,"162" ,"163" ,"170" ,"176" ,"177" ,
-                "181" ,"184" ,"186" ,"187" ,"197" ,"202" ,"207" ,"215" ,
-                "222" ,"223" ,"224" ,"228" ,"233" ,"234" ,"251" ,"252" ->
+                1, 2, 9,
+                7, 8, 12 ,15 ,23 ,29 ,30 ,36 ,41 ,
+                59 ,60 ,61 ,62 ,71 ,75 ,76 ,83 ,84 ,
+                90 ,97 ,98 ,100 ,102 ,104 ,105 ,113 ,
+                115 ,116 ,117 ,119 ,125 ,132 ,133 ,141 ,
+                149 ,158 ,159 ,162 ,163 ,170 ,176 ,177 ,
+                181 ,184 ,186 ,187 ,197 ,202 ,207 ,215 ,
+                222 ,223 ,224 ,228 ,233 ,234 ,251 ,252 ->
                     getAltitudeUSA(altitudeFileData, latitude, longitude)
                 else ->
                     null

@@ -9,12 +9,13 @@ import io.realm.kotlin.types.annotations.PrimaryKey
 class CCFileInfo : RealmObject {
     @PrimaryKey
     var ccID = ""
-    var countryCode = ""
-    var stateCode = ""
+    var countryCode = 0
+    var stateCode = 0
 
     var downloadDate = RealmInstant.from(0, 0)
 
     var altitude = ""
 
-    var undulations: RealmList<Undulation> = realmListOf()
+    var holeMaps: RealmList<HoleMap> = realmListOf()
+    var undulationMaps: RealmList<UndulationMap> = realmListOf()
 }

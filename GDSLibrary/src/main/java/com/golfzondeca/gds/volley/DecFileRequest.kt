@@ -3,6 +3,7 @@ package com.golfzondeca.gds.volley
 import com.android.volley.AuthFailureError
 import com.android.volley.NetworkResponse
 import com.android.volley.Response
+import com.android.volley.VolleyError
 import com.android.volley.toolbox.HttpHeaderParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +15,7 @@ import java.security.MessageDigest
 import java.util.*
 import kotlin.random.Random
 
-class UndulationFileRequest(
+class DecFileRequest(
     url: String,
     private val ccID: String,
     private val courseNum: Int,
@@ -78,5 +79,4 @@ class UndulationFileRequest(
         //Pass the response data here
         return Response.success(response.data, HttpHeaderParser.parseCacheHeaders(response))
     }
-
 }

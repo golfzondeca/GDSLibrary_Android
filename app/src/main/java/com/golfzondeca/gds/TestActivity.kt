@@ -8,7 +8,7 @@ import timber.log.Timber
 @AndroidEntryPoint
 class TestActivity: ComponentActivity(), GDSRepository.Callback {
     private val gdsRepository by lazy {
-        GDSRepository(this, "", "")
+        GDSRepository(this, "")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -16,7 +16,15 @@ class TestActivity: ComponentActivity(), GDSRepository.Callback {
         Timber.d("onCreate")
 
         gdsRepository.addCallback(this)
-        gdsRepository.loadCCData("66011")
+        gdsRepository.loadCCData(
+            "66011",
+            1,
+            0,
+            2,
+            useAltitude = true,
+            useHoleMap = true,
+            useUndulationMap = false
+        )
     }
 
     override fun onCCDataReady(ccID: String) {
