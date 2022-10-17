@@ -25,6 +25,7 @@ class TestViewModel @Inject constructor(
     val altitudeData = MutableLiveData<Int?>(null)
     val holeMapData = MutableLiveData<Bitmap?>(null)
 
+/*
     val ccID = MutableStateFlow("66011")
     val countryCode = MutableStateFlow("1")
     val stateCode = MutableStateFlow("0")
@@ -32,6 +33,16 @@ class TestViewModel @Inject constructor(
     val courseNum = MutableStateFlow("1")
     val latitude = MutableStateFlow("37.095045")
     val longitude = MutableStateFlow("127.334654")
+    val holeNum = MutableStateFlow("1")
+*/
+
+    val ccID = MutableStateFlow("65706")
+    val countryCode = MutableStateFlow("1")
+    val stateCode = MutableStateFlow("0")
+    val courseCount = MutableStateFlow("4")
+    val courseNum = MutableStateFlow("1")
+    val latitude = MutableStateFlow("33.447024")
+    val longitude = MutableStateFlow("126.511686")
     val holeNum = MutableStateFlow("1")
 
     init {
