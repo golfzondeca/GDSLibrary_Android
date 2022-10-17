@@ -10,6 +10,8 @@ import com.golfzondeca.gds.data.realm.CCFileInfo
 import com.golfzondeca.gds.data.realm.HoleMap
 import com.golfzondeca.gds.data.realm.UndulationMap
 import com.golfzondeca.gds.util.AltitudeUtil
+import com.golfzondeca.gds.util.MapFileUtil
+import com.golfzondeca.gds.util.UndulationFileUtil
 import com.golfzondeca.gds.volley.*
 import io.realm.kotlin.Realm
 import io.realm.kotlin.RealmConfiguration
@@ -22,6 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
 import java.io.FileInputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -165,9 +168,9 @@ class GDSRepository (
         ccID: String,
         courseNum: Int,
         holeNum: Int,
-    ): Array<Bitmap>? {
+    ): Bitmap? {
         ccDataMap[ccID]?.holeMapFileDatas?.get(courseNum)?.let {
-            return null
+            return MapFileUtil.getMapBitmap(it, holeNum)
         } ?: run {
             return null
         }
@@ -177,9 +180,9 @@ class GDSRepository (
         ccID: String,
         courseNum: Int,
         holeNum: Int,
-    ): Array<Bitmap>? {
+    ): ArrayList<Bitmap>? {
         ccDataMap[ccID]?.undulationMapFileDatas?.get(courseNum)?.let {
-            return null
+            return UndulationFileUtil.getUndulationBitmap(it, holeNum)
         } ?: run {
             return null
         }
@@ -228,21 +231,38 @@ class GDSRepository (
         useHoleMap: Boolean,
         useUndulationMap: Boolean,
     ) {
-        realm.writeBlocking {
-            val ccFileInfo =
-                query<CCFileInfo>("ccID == $0", ccID).first().find() ?:
-                copyToRealm(CCFileInfo().apply { this.ccID = ccID })
+        var isNewCCAltitudeData = false
+        var isNewCCHoleMapData = false
+        var isNewCCUndulationMapData = false
+
+        val downloadPath = "${context.dataDir}/map"
+
+        val ccFileInfo = realm.writeBlocking {
+            var ccFileInfo =
+                query<CCFileInfo>("ccID == $0", ccID).first().find()
+
+            if(ccFileInfo == null) {
+                isNewCCAltitudeData = true
+                isNewCCHoleMapData = true
+                isNewCCUndulationMapData = true
+                ccFileInfo = copyToRealm(CCFileInfo().apply { this.ccID = ccID })
+            }
+            else {
+                if(useAltitude && ccFileInfo.altitude.isBlank()) isNewCCAltitudeData = true
+                if(useHoleMap && ccFileInfo.holeMaps.size < 1) isNewCCHoleMapData = true
+                if(useUndulationMap && ccFileInfo.undulationMaps.size < 1) isNewCCUndulationMapData = true
+            }
 
             ccFileInfo.countryCode = countryCode
             ccFileInfo.stateCode = stateCode
             ccFileInfo.downloadDate = RealmInstant.from(Date().time / 1000, 0)
+
+            ccFileInfo
         }
 
         if(!ccDataMap.containsKey(ccID)) {
             ccDataMap[ccID] = CCData(countryCode)
         }
-
-        val downloadPath = "${context.dataDir}/map"
 
         ccRequestStatusQueue.offer(
             CCRequestStatus(
@@ -258,32 +278,7 @@ class GDSRepository (
             }
         )
 
-        if(useHoleMap) {
-            for (courseNum in 1..courseCount.toInt()) {
-                val holeMapUrl = Uri
-                    .parse(URL_UPDATE_HOLE_MAP_DEC)
-                    .buildUpon()
-                    .appendPath("${ccID}_${courseNum}.dec")
-                    .build().toString()
-
-                Timber.d("url : $holeMapUrl")
-
-                val holeMapRequest = DecFileRequest(
-                    holeMapUrl,
-                    ccID,
-                    courseNum,
-                    downloadPath,
-                    holeMapListener,
-                    holeMapErrorListener,
-                    10000,
-                    0
-                )
-
-                holeMapQueue.add(holeMapRequest)
-            }
-        }
-
-        if(useAltitude) {
+        if(isNewCCAltitudeData) {
             val locationPath =
                 when (countryCode) {
                     1 -> "L${countryCode}_v2" // 한국
@@ -311,6 +306,63 @@ class GDSRepository (
             )
 
             binQueue.add(binRequest)
+        } else {
+            val file = File(downloadPath, ccFileInfo.altitude)
+
+            val binFileData = ByteArray(file.length().toInt())
+
+            FileInputStream(file).let {
+                it.read(binFileData)
+                it.close()
+            }
+
+            ccDataMap[ccID]!!.binFileData = ByteBuffer.wrap(binFileData)
+        }
+
+        if(isNewCCHoleMapData) {
+            for (courseNum in 1..courseCount.toInt()) {
+                val holeMapUrl = Uri
+                    .parse(URL_UPDATE_HOLE_MAP_DEC)
+                    .buildUpon()
+                    .appendPath("${ccID}_${courseNum}.dec")
+                    .build().toString()
+
+                Timber.d("url : $holeMapUrl")
+
+                val holeMapRequest = DecFileRequest(
+                    holeMapUrl,
+                    ccID,
+                    courseNum,
+                    downloadPath,
+                    holeMapListener,
+                    holeMapErrorListener,
+                    10000,
+                    0
+                )
+
+                holeMapQueue.add(holeMapRequest)
+            }
+        } else {
+            ccFileInfo.holeMaps.forEach {
+                val file = File(downloadPath, it.file)
+
+                val mapFileData = ByteArray(file.length().toInt())
+
+                FileInputStream(file).let {
+                    it.read(mapFileData)
+                    it.close()
+                }
+
+                ccDataMap[ccID]!!.holeMapFileDatas[it.courseNum] = ByteBuffer.wrap(mapFileData)
+            }
+        }
+
+        if(isNewCCUndulationMapData) {
+
+        }
+
+        if(!isNewCCAltitudeData && !isNewCCHoleMapData && !isNewCCUndulationMapData) {
+            broadcastReady()
         }
     }
 
