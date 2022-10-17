@@ -7,13 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
@@ -187,7 +185,14 @@ fun TestScreen() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        TextButton(onClick = { viewModel.onRequestData() }) {
+        TextButton(
+            modifier = Modifier.padding(1.dp, 0.dp),
+            onClick = { viewModel.onRequestData() },
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.Blue,
+                contentColor = Color.White
+            ),
+        ) {
             Text(text = "Request Data")
         }        
 

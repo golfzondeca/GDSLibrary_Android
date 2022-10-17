@@ -17,12 +17,9 @@ import io.realm.kotlin.Realm
 import io.realm.kotlin.RealmConfiguration
 import io.realm.kotlin.ext.query
 import io.realm.kotlin.types.RealmInstant
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
@@ -35,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.Lock
 import java.util.function.IntUnaryOperator
 
+@OptIn(DelicateCoroutinesApi::class)
 @SuppressLint("MissingPermission")
 class GDSRepository (
     private val context: Context,
@@ -169,6 +167,8 @@ class GDSRepository (
         courseNum: Int,
         holeNum: Int,
     ): Bitmap? {
+        if(courseNum < 1 || holeNum < 1) return null
+
         ccDataMap[ccID]?.holeMapFileDatas?.get(courseNum)?.let {
             return MapFileUtil.getMapBitmap(it, holeNum)
         } ?: run {
@@ -181,6 +181,8 @@ class GDSRepository (
         courseNum: Int,
         holeNum: Int,
     ): ArrayList<Bitmap>? {
+        if(courseNum < 1 || holeNum < 1) return null
+
         ccDataMap[ccID]?.undulationMapFileDatas?.get(courseNum)?.let {
             return UndulationFileUtil.getUndulationBitmap(it, holeNum)
         } ?: run {
@@ -267,13 +269,11 @@ class GDSRepository (
         ccRequestStatusQueue.offer(
             CCRequestStatus(
                 ccID,
-                !useAltitude,
+                !isNewCCAltitudeData,
             ).apply {
-                if(useHoleMap) {
-                    repeat(courseCount) {
-                        if(useHoleMap) holeMapCheckMap[it + 1] = false
-                        if(useUndulationMap) undulationMapCheckMap[it + 1] = false
-                    }
+                repeat(courseCount) {
+                    if(isNewCCHoleMapData) holeMapCheckMap[it + 1] = false
+                    if(isNewCCUndulationMapData) undulationMapCheckMap[it + 1] = false
                 }
             }
         )
