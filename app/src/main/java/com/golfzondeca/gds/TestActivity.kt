@@ -10,10 +10,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -22,6 +24,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
 @AndroidEntryPoint
+@ExperimentalComposeUiApi
 class TestActivity: ComponentActivity() {
     private val gdsRepository by lazy {
         GDSRepository(this, "")
@@ -44,8 +47,11 @@ class TestActivity: ComponentActivity() {
 }
 
 @Composable
+@ExperimentalComposeUiApi
 fun TestScreen() {
     val viewModel: TestViewModel = viewModel()
+
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val altitudeData: Int? by viewModel.altitudeData.observeAsState(null)
     val holeMapData: Bitmap? by viewModel.holeMapData.observeAsState(null)
@@ -187,7 +193,10 @@ fun TestScreen() {
 
         TextButton(
             modifier = Modifier.padding(1.dp, 0.dp),
-            onClick = { viewModel.onRequestData() },
+            onClick = {
+                keyboardController?.hide()
+                viewModel.onRequestData()
+            },
             colors = ButtonDefaults.buttonColors(
                 backgroundColor = Color.Blue,
                 contentColor = Color.White

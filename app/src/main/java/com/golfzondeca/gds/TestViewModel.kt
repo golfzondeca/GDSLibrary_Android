@@ -36,6 +36,7 @@ class TestViewModel @Inject constructor(
     val holeNum = MutableStateFlow("1")
 */
 
+/*
     val ccID = MutableStateFlow("65706")
     val countryCode = MutableStateFlow("1")
     val stateCode = MutableStateFlow("0")
@@ -43,6 +44,16 @@ class TestViewModel @Inject constructor(
     val courseNum = MutableStateFlow("1")
     val latitude = MutableStateFlow("33.447024")
     val longitude = MutableStateFlow("126.511686")
+    val holeNum = MutableStateFlow("1")
+*/
+
+    val ccID = MutableStateFlow("65844")
+    val countryCode = MutableStateFlow("1")
+    val stateCode = MutableStateFlow("0")
+    val courseCount = MutableStateFlow("2")
+    val courseNum = MutableStateFlow("1")
+    val latitude = MutableStateFlow("37.074154")
+    val longitude = MutableStateFlow("127.193799")
     val holeNum = MutableStateFlow("1")
 
     init {
