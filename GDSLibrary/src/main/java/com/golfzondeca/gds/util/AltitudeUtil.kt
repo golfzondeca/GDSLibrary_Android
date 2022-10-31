@@ -1,9 +1,20 @@
 package com.golfzondeca.gds.util
 
-import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
+
+fun ByteBuffer.getUByte() : Int {
+    return this.get().toInt() and 0xFF
+}
+
+fun ByteBuffer.getUShort() : Int {
+    return this.short.toInt() and 0xFFFF
+}
+
+fun ByteBuffer.getUInt() : Long {
+    return this.int.toLong() and 0xFFFFFFFF
+}
 
 class AltitudeUtil {
     companion object

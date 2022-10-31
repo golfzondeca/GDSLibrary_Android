@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.util.Base64
 import com.android.volley.Response
 import com.android.volley.toolbox.Volley
 import com.golfzondeca.gds.data.realm.CCFileInfo
@@ -42,19 +43,47 @@ class GDSRepository (
     companion object {
         // 그린 파일
         private const val URL_UPDATE_UNDULATION_MAP_DEC =
-            "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/w10/ccid_green/L1/ccid/"
+            //"w10/ccid_green/L1/ccid/"
+            "dzEwL2NjaWRfZ3JlZW4vTDEvY2NpZC8="
 
         // 맵 파일
         private const val URL_UPDATE_HOLE_MAP_DEC =
-            "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/w10/dec/"
+            //"w10/dec/"
+            "dzEwL2RlYy8="
 
         // 고도 파일 (.bin)
         private const val URL_UPDATE_BIN =
-            "https://d1iaurndxudtwi.cloudfront.net/G3Manager/AutoUpdate/slope/slope_mobile/"
+            //"slope/slope_mobile/"
+            "c2xvcGUvc2xvcGVfbW9iaWxlLw=="
 
-        /*// CC 찾기
-        private const val URL_SEARCH_CC =
-            "https://www.gpsgolfbuddy.com/app/cc/search.asp"*/
+        // 공통 서버 path
+        private const val URL_PREFIX_4 =
+            //"toUpdate/"
+            "dG9VcGRhdGUv"
+
+        private const val URL_PREFIX_2 =
+            //"front.net/G3M"
+            "ZnJvbnQubmV0L0czTQ=="
+
+        private const val URL_PREFIX_A =
+            //"anagerControl/Au"
+            "YW5hZ2VyQ29udHJvbC9BdQ=="
+
+        private const val URL_PREFIX_1 =
+            //"d1iaurndxudtwi.cloud"
+            "ZDFpYXVybmR4dWR0d2kuY2xvdWQ="
+
+        private const val URL_PREFIX_0 =
+            //"https://"
+            "aHR0cHM6Ly8="
+
+        private const val URL_PREFIX_B =
+            //"toMap/"
+            "dG9NYXAv"
+
+        private const val URL_PREFIX_3 =
+            //"anager/Au"
+            "YW5hZ2VyL0F1"
 
         const val ERROR_NETWORK = 1
         const val ERROR_DOWNLOAD = 3
@@ -69,6 +98,10 @@ class GDSRepository (
             ccID: String,
             error: Int
         )
+    }
+
+    private fun getBase64decode(content: String): String {
+        return String(Base64.decode(content, Base64.NO_WRAP))
     }
 
     private val config =
@@ -287,7 +320,7 @@ class GDSRepository (
                 }
 
             val binUrl = Uri
-                .parse(URL_UPDATE_BIN)
+                .parse("${getBase64decode(URL_PREFIX_0)}${getBase64decode(URL_PREFIX_1)}${getBase64decode(URL_PREFIX_2)}${getBase64decode(URL_PREFIX_3)}${getBase64decode(URL_PREFIX_4)}${getBase64decode(URL_UPDATE_BIN)}")
                 .buildUpon()
                 .appendPath(locationPath)
                 .appendPath("${ccID}_cb_4M.bin")
@@ -322,7 +355,7 @@ class GDSRepository (
         if(isNewCCHoleMapData) {
             for (courseNum in 1..courseCount.toInt()) {
                 val holeMapUrl = Uri
-                    .parse(URL_UPDATE_HOLE_MAP_DEC)
+                    .parse("${getBase64decode(URL_PREFIX_0)}${getBase64decode(URL_PREFIX_1)}${getBase64decode(URL_PREFIX_2)}${getBase64decode(URL_PREFIX_3)}${getBase64decode(URL_PREFIX_4)}${getBase64decode(URL_UPDATE_HOLE_MAP_DEC)}")
                     .buildUpon()
                     .appendPath("${ccID}_${courseNum}.dec")
                     .build().toString()
