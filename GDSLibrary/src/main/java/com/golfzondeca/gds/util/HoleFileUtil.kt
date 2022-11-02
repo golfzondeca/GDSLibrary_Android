@@ -6,7 +6,7 @@ import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class MapFileUtil {
+class HoleFileUtil {
     companion object {
         fun getMapBitmap(mapFileData: ByteBuffer, holeNum : Int): Bitmap? {
             mapFileData.order(ByteOrder.LITTLE_ENDIAN)

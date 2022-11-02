@@ -19,11 +19,12 @@ class TestViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ): ViewModel(), GDSRepository.Callback {
     private val gdsRepository by lazy {
-        GDSRepository(context, "")
+        GDSRepository(context, "golfzondeca")
     }
 
     val altitudeData = MutableLiveData<Int?>(null)
     val holeMapData = MutableLiveData<Bitmap?>(null)
+    val undulationMapData = MutableLiveData<ArrayList<Bitmap>?>(null)
 
 /*
     val ccID = MutableStateFlow("66011")
@@ -36,7 +37,7 @@ class TestViewModel @Inject constructor(
     val holeNum = MutableStateFlow("1")
 */
 
-/*
+
     val ccID = MutableStateFlow("65706")
     val countryCode = MutableStateFlow("1")
     val stateCode = MutableStateFlow("0")
@@ -45,8 +46,8 @@ class TestViewModel @Inject constructor(
     val latitude = MutableStateFlow("33.447024")
     val longitude = MutableStateFlow("126.511686")
     val holeNum = MutableStateFlow("1")
-*/
 
+/*
     val ccID = MutableStateFlow("65844")
     val countryCode = MutableStateFlow("1")
     val stateCode = MutableStateFlow("0")
@@ -55,6 +56,7 @@ class TestViewModel @Inject constructor(
     val latitude = MutableStateFlow("37.074154")
     val longitude = MutableStateFlow("127.193799")
     val holeNum = MutableStateFlow("1")
+*/
 
     init {
         gdsRepository.addCallback(this)
@@ -122,7 +124,7 @@ class TestViewModel @Inject constructor(
             courseCount.value.toInt(),
             useAltitude = true,
             useHoleMap = true,
-            useUndulationMap = false
+            useUndulationMap = true
         )
     }
 
@@ -134,6 +136,7 @@ class TestViewModel @Inject constructor(
         if(ccID == this@TestViewModel.ccID.value) {
             altitudeData.postValue(gdsRepository.getAltitude(ccID, latitude.value.toDouble(), longitude.value.toDouble()))
             holeMapData.postValue(gdsRepository.getHoleMap(ccID, courseNum.value.toInt(), holeNum.value.toInt()))
+            undulationMapData.postValue(gdsRepository.getUndulationMap(ccID, courseNum.value.toInt(), holeNum.value.toInt()))
         }
     }
 

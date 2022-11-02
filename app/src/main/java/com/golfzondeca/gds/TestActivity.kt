@@ -13,7 +13,6 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,6 +54,7 @@ fun TestScreen() {
 
     val altitudeData: Int? by viewModel.altitudeData.observeAsState(null)
     val holeMapData: Bitmap? by viewModel.holeMapData.observeAsState(null)
+    val undulationMapData: ArrayList<Bitmap>? by viewModel.undulationMapData.observeAsState(null)
 
     var ccId by remember { mutableStateOf(TextFieldValue(viewModel.ccID.value)) }
     var countryCode by remember { mutableStateOf(TextFieldValue(viewModel.countryCode.value)) }
@@ -214,8 +214,17 @@ fun TestScreen() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        holeMapData?.let {
-            Image(bitmap = it.asImageBitmap(), contentDescription = "")
+        Row {
+            holeMapData?.let {
+                Image(bitmap = it.asImageBitmap(), contentDescription = "")
+            }
+
+            undulationMapData?.let { list ->
+                list.forEach {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Image(bitmap = it.asImageBitmap(), contentDescription = "")
+                }
+            }
         }
     }
 }

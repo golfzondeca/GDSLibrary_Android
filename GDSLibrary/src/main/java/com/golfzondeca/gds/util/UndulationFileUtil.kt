@@ -14,9 +14,9 @@ class UndulationFileUtil {
 
             val header1Len = mapFileData.int
 
-            val infoOffset = 12 + (holeNum - 1) * 24
+            val infoOffset = 24 + (holeNum - 1) * 24
 
-            if(infoOffset <= header1Len + 12) {
+            if(infoOffset <= header1Len + 24) {
 
                 mapFileData.position(infoOffset)
 

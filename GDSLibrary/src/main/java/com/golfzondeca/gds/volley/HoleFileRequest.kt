@@ -3,7 +3,6 @@ package com.golfzondeca.gds.volley
 import com.android.volley.AuthFailureError
 import com.android.volley.NetworkResponse
 import com.android.volley.Response
-import com.android.volley.VolleyError
 import com.android.volley.toolbox.HttpHeaderParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,12 +14,13 @@ import java.security.MessageDigest
 import java.util.*
 import kotlin.random.Random
 
-class DecFileRequest(
+class HoleFileRequest(
     url: String,
+    private val headers: MutableMap<String, String>?,
     private val ccID: String,
     private val courseNum: Int,
     private val downloadFolderPath: String,
-    private val listener: Response.Listener<UndulationFileResponse>,
+    private val listener: Response.Listener<HoleFileResponse>,
     errorListener: Response.ErrorListener,
     initialTimeoutMs: Int = 6000,
     maxNumRetries: Int = 5,
@@ -31,6 +31,8 @@ class DecFileRequest(
     }
 
     var responseHeaders: Map<String, String>? = null
+
+    override fun getHeaders(): MutableMap<String, String> = headers ?: super.getHeaders()
 
     @Throws(AuthFailureError::class)
     override fun getParams(): Map<String, String>? {
@@ -51,9 +53,9 @@ class DecFileRequest(
                 outputStream.write(response)
                 outputStream.close()
             }.onSuccess {
-                listener.onResponse(UndulationFileResponse(ccID, courseNum, downloadFile))
+                listener.onResponse(HoleFileResponse(ccID, courseNum, downloadFile))
             }.onFailure {
-                listener.onResponse(UndulationFileResponse(ccID, courseNum, null))
+                listener.onResponse(HoleFileResponse(ccID, courseNum, null))
             }
 
         }

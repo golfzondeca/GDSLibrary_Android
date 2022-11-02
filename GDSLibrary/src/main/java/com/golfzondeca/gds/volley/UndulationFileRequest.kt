@@ -14,12 +14,13 @@ import java.security.MessageDigest
 import java.util.*
 import kotlin.random.Random
 
-class AltitudeFileRequest(
+class UndulationFileRequest(
     url: String,
     private val headers: MutableMap<String, String>?,
     private val ccID: String,
+    private val courseNum: Int,
     private val downloadFolderPath: String,
-    private val listener: Response.Listener<AltitudeFileResponse>,
+    private val listener: Response.Listener<UndulationFileResponse>,
     errorListener: Response.ErrorListener,
     initialTimeoutMs: Int = 6000,
     maxNumRetries: Int = 5,
@@ -52,9 +53,9 @@ class AltitudeFileRequest(
                 outputStream.write(response)
                 outputStream.close()
             }.onSuccess {
-                listener.onResponse(AltitudeFileResponse(ccID, downloadFile))
+                listener.onResponse(UndulationFileResponse(ccID, courseNum, downloadFile))
             }.onFailure {
-                listener.onResponse(AltitudeFileResponse(ccID, null))
+                listener.onResponse(UndulationFileResponse(ccID, courseNum, null))
             }
 
         }
@@ -80,5 +81,4 @@ class AltitudeFileRequest(
         //Pass the response data here
         return Response.success(response.data, HttpHeaderParser.parseCacheHeaders(response))
     }
-
 }
