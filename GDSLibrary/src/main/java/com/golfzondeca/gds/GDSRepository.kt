@@ -3,6 +3,7 @@ package com.golfzondeca.gds
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.location.Location
 import android.net.Uri
 import android.util.Base64
 import com.android.volley.Response
@@ -188,6 +189,31 @@ class GDSRepository (
                     longitude
                 )
 
+            } ?: run {
+                return null
+            }
+        } ?: run {
+            return null
+        }
+    }
+
+    fun getAreaAltitudes(
+        ccID: String,
+        left: Double,
+        top: Double,
+        right: Double,
+        bottom: Double,
+    ): List<Triple<Double, Double, Int>>? {
+        ccDataMap[ccID]?.let {
+            it.binFileData?.let { fileData ->
+                return AltitudeUtil.getAreaAltitudes(
+                    it.countryCode,
+                    fileData,
+                    left,
+                    top,
+                    right,
+                    bottom
+                )
             } ?: run {
                 return null
             }
