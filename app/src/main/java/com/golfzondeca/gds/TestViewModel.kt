@@ -3,6 +3,7 @@ package com.golfzondeca.gds
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Environment
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 @SuppressLint("StaticFieldLeak")
@@ -19,24 +21,12 @@ class TestViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ): ViewModel(), GDSRepository.Callback {
     private val gdsRepository by lazy {
-        GDSRepository(context, "golfzondeca")
+        GDSRepository(context, "golfzondeca", "")
     }
 
     val altitudeData = MutableLiveData<Int?>(null)
     val holeMapData = MutableLiveData<Bitmap?>(null)
     val undulationMapData = MutableLiveData<ArrayList<Bitmap>?>(null)
-
-/*
-    val ccID = MutableStateFlow("66011")
-    val countryCode = MutableStateFlow("1")
-    val stateCode = MutableStateFlow("0")
-    val courseCount = MutableStateFlow("2")
-    val courseNum = MutableStateFlow("1")
-    val latitude = MutableStateFlow("37.095045")
-    val longitude = MutableStateFlow("127.334654")
-    val holeNum = MutableStateFlow("1")
-*/
-
 
     val ccID = MutableStateFlow("65706")
     val countryCode = MutableStateFlow("1")
@@ -46,17 +36,6 @@ class TestViewModel @Inject constructor(
     val latitude = MutableStateFlow("33.447024")
     val longitude = MutableStateFlow("126.511686")
     val holeNum = MutableStateFlow("1")
-
-/*
-    val ccID = MutableStateFlow("65844")
-    val countryCode = MutableStateFlow("1")
-    val stateCode = MutableStateFlow("0")
-    val courseCount = MutableStateFlow("2")
-    val courseNum = MutableStateFlow("1")
-    val latitude = MutableStateFlow("37.074154")
-    val longitude = MutableStateFlow("127.193799")
-    val holeNum = MutableStateFlow("1")
-*/
 
     init {
         gdsRepository.addCallback(this)
@@ -115,7 +94,7 @@ class TestViewModel @Inject constructor(
         }
     }
 
-    fun onRequestData()
+    fun loadRemoteData()
     {
         gdsRepository.loadCCData(
             ccID.value,
@@ -124,8 +103,49 @@ class TestViewModel @Inject constructor(
             courseCount.value.toInt(),
             useAltitude = true,
             useHoleMap = true,
-            useUndulationMap = true
+            useUndulationMap = true,
+            useCache = false
         )
+    }
+
+    fun loadAssetData()
+    {
+        if(gdsRepository.loadCCAssetData(
+                ccID.value,
+                countryCode.value.toInt(),
+                courseCount.value.toInt(),
+                useAltitude = true,
+                useHoleMap = true,
+                useUndulationMap = true,
+            )
+        ) {
+            Timber.d("loadAssetData success")
+            altitudeData.postValue(gdsRepository.getAltitude(ccID.value, latitude.value.toDouble(), longitude.value.toDouble()))
+            holeMapData.postValue(gdsRepository.getHoleMap(ccID.value, courseNum.value.toInt(), holeNum.value.toInt()))
+            undulationMapData.postValue(gdsRepository.getUndulationMap(ccID.value, courseNum.value.toInt(), holeNum.value.toInt()))
+        } else {
+            Timber.d("loadAssetData failed")
+        }
+    }
+
+    fun loadFileData()
+    {
+        if(gdsRepository.loadCCFileData(
+            ccID.value,
+            countryCode.value.toInt(),
+            courseCount.value.toInt(),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "65706/"),
+            useAltitude = true,
+            useHoleMap = true,
+            useUndulationMap = true,
+        )) {
+                Timber.d("loadFileData success")
+                altitudeData.postValue(gdsRepository.getAltitude(ccID.value, latitude.value.toDouble(), longitude.value.toDouble()))
+                holeMapData.postValue(gdsRepository.getHoleMap(ccID.value, courseNum.value.toInt(), holeNum.value.toInt()))
+                undulationMapData.postValue(gdsRepository.getUndulationMap(ccID.value, courseNum.value.toInt(), holeNum.value.toInt()))
+        } else {
+            Timber.d("loadFileData failed")
+        }
     }
 
     override fun onCCDataReady(ccID: String) {

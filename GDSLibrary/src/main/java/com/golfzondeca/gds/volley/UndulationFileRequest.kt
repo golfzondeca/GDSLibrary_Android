@@ -66,7 +66,7 @@ class UndulationFileRequest(
             val md = MessageDigest.getInstance("SHA-256")
             md.update(str.toByteArray())
             val hash = md.digest()
-            return String.format("%64x", BigInteger(1, hash))
+            return String.format("%064x", BigInteger(1, hash))
         }
         catch (e: CloneNotSupportedException) {
 

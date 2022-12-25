@@ -1,7 +1,12 @@
 package com.golfzondeca.gds
 
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -26,7 +31,7 @@ import timber.log.Timber
 @ExperimentalComposeUiApi
 class TestActivity: ComponentActivity() {
     private val gdsRepository by lazy {
-        GDSRepository(this, "")
+        GDSRepository(this, "", "")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,7 +46,34 @@ class TestActivity: ComponentActivity() {
                 TestScreen()
             }
         }
+    }
 
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if(Environment.isExternalStorageManager()) {
+
+            } else {
+                try {
+                    startActivity(
+                        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
+                            addCategory("android.intent.category.DEFAULT")
+                            data = Uri.parse(String.format("package:%s", application.packageName))
+                            startActivity(intent)
+                        }
+                    )
+                } catch (e: Exception) {
+                    startActivity(
+                        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
+                            addCategory("android.intent.category.DEFAULT")
+                            startActivity(intent)
+                        }
+                    )
+                }
+            }
+        } else {
+            TODO("VERSION.SDK_INT < R")
+        }
     }
 }
 
@@ -191,19 +223,51 @@ fun TestScreen() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        TextButton(
-            modifier = Modifier.padding(1.dp, 0.dp),
-            onClick = {
-                keyboardController?.hide()
-                viewModel.onRequestData()
-            },
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = Color.Blue,
-                contentColor = Color.White
-            ),
-        ) {
-            Text(text = "Request Data")
-        }        
+        Row {
+            TextButton(
+                modifier = Modifier.padding(1.dp, 0.dp),
+                onClick = {
+                    keyboardController?.hide()
+                    viewModel.loadRemoteData()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.Blue,
+                    contentColor = Color.White
+                ),
+            ) {
+                Text(text = "Load Remote")
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+            TextButton(
+                modifier = Modifier.padding(1.dp, 0.dp),
+                onClick = {
+                    keyboardController?.hide()
+                    viewModel.loadAssetData()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.Blue,
+                    contentColor = Color.White
+                ),
+            ) {
+                Text(text = "Load Asset")
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+            TextButton(
+                modifier = Modifier.padding(1.dp, 0.dp),
+                onClick = {
+                    keyboardController?.hide()
+                    viewModel.loadFileData()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.Blue,
+                    contentColor = Color.White
+                ),
+            ) {
+                Text(text = "Load File")
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
